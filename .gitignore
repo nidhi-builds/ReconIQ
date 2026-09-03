@@ -1,0 +1,12 @@
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+.pytest-tmp/
+pytest-cache-files-*/
+*.py[cod]
+node_modules/
+.next/
+data/generated/
+coverage.xml
+htmlcov/
