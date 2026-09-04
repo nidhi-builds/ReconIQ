@@ -280,7 +280,13 @@ def test_refund_cases_include_original_and_linked_reversal_legs() -> None:
                 - settlements[0].gst_on_fee
             )
             assert truth.refund_of == settlements[0].ref_id
+            assert ledger[1].ref_id == f"{truth.refund_of}-refund"
             assert bank[1].ref_id == f"{truth.refund_of}-refund"
+            assert ledger[1].amount == -ledger[0].amount
+            assert bank[1].amount == -ledger[0].amount
+            assert bank[0].amount + bank[1].amount == pytest.approx(
+                -(settlements[0].fee + settlements[0].gst_on_fee)
+            )
 
 
 def test_nontransaction_narrations_cover_the_planned_examples() -> None:

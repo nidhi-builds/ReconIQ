@@ -88,6 +88,18 @@
 - **Edge cases:** 2-5 parts, strict tolerance, blank refs, window boundaries, method/date mismatch, invalid currency/amount, duplicate refs, both ambiguity directions, stored net source, empty inputs, and stable ordering.
 - **Claude checkpoint:** COMPLETE - no implementation bug found; required coverage gap closed.
 
+## 07 - Stage 5 Refund/Reversal Link
+
+- **Status:** PASS - Claude implementation review complete; Ponytail review passed.
+- **Implemented:** Typed confirmed-original context, unique `-refund` reference linking, gross-amount anchoring, reachable ambiguity rejection, and separate refund results without reopening Stage 2 matches.
+- **Gate evidence:** 17/17 focused Stage 5 and generator checks passed; 109/109 full-suite tests passed.
+- **Metrics:** 6/6 design refund truth groups covered by the union of Stage 2 and Stage 5 results; 100% coverage and 0 incorrect refund links.
+- **Decisions:** The pipeline caller constructs `ConfirmedReference` from Stage 2 output plus the full ledger. Refund ledger and bank legs both reverse original gross; original bank plus refund bank therefore nets to the non-refundable fee and GST loss.
+- **Issue / resolution:** Review exposed an unverified refund-amount assumption. Generator assertions and Razorpay policy verification confirmed the full-gross reversal; amount drift and equal-amount unrelated originals now have direct regression tests.
+- **Review disposition:** Distinct refund refs cannot strip to the same original under exact `-refund` suffix removal; the redundant candidate counter was removed. Duplicate refund refs and duplicate confirmed originals remain directly tested.
+- **Edge cases:** Missing/blank refs, absent or duplicate originals, duplicate refund candidates, partial/amount-drift refunds, non-refund negatives, non-mutation, stable ordering, and empty inputs are covered.
+- **Claude checkpoint:** COMPLETE - implementation and generator accounting proof approved; unreachable ambiguity guard removed.
+
 ## Next
 
-- Request approval to commit Stage 4, then prepare the Stage 5 design.
+- Commit Stage 5, then prepare the Stage 6 design.

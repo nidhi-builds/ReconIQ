@@ -310,6 +310,8 @@ All metrics computed against `ground_truth.csv` — never eyeball the output.
 - Many-to-many splits across multiple days
 - Chargebacks/disputes arriving weeks later
 - Incremental re-matching against a partially-reconciled prior state
+- Linking a refund to an original split-settlement group
+- Reconciling multi-month EMI installments
 
 ---
 
