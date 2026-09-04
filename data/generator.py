@@ -7,6 +7,9 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from matching.rate_card import calculate_settlement_amounts
+from matching.settlement_windows import settlement_window_days
+
 from data.schemas import (
     BankEntry,
     DatasetPartition,
@@ -42,8 +45,6 @@ _NON_TRANSACTION_NARRATIONS = (
     "GST REFUND",
     "INTERNAL TRANSFER",
 )
-_FEE_RATE = 0.02
-_GST_RATE = 0.18
 _TDS_RULES = {
     "upi": (0.01, "194H"),
     "card": (0.01, "194H"),
@@ -126,9 +127,9 @@ def _build_case(
     order_date = date(2026, 1, 1) + timedelta(days=index)
     payment_method = _PAYMENT_METHODS[index % len(_PAYMENT_METHODS)]
     gross_amount = round(rng.uniform(200, 5_000), 2)
-    fee = round(gross_amount * _FEE_RATE, 2)
-    gst_on_fee = round(fee * _GST_RATE, 2)
-    net_amount = round(gross_amount - fee - gst_on_fee, 2)
+    fee, gst_on_fee, net_amount = calculate_settlement_amounts(
+        gross_amount, payment_method
+    )
     tds_rate, tds_section = _TDS_RULES[payment_method]
     tds_expected = round(gross_amount * tds_rate, 2)
 
@@ -176,10 +177,14 @@ def _build_case(
     if case_type in {"FEE_ADJUSTED_MATCH", "TIMING_LAG_WITHIN_WINDOW"}:
         bank[0].ref_id = None
         if case_type == "TIMING_LAG_WITHIN_WINDOW":
-            bank[0].value_date += timedelta(days=2)
+            bank[0].value_date += timedelta(
+                days=settlement_window_days(payment_method) - 1
+            )
     elif case_type == "TIMING_LAG_EXCEEDED":
         bank[0].ref_id = None
-        bank[0].value_date += timedelta(days=10)
+        bank[0].value_date += timedelta(
+            days=settlement_window_days(payment_method) + 1
+        )
         true_match_group = None
         exception_reason = "TIMING_LAG_EXCEEDED"
     elif case_type == "SPLIT_SETTLEMENT":
@@ -323,8 +328,9 @@ def _split_rows(
     settlements: list[SettlementEntry] = []
 
     for part, amount in enumerate(amounts, start=1):
-        fee = round(amount * _FEE_RATE, 2)
-        gst_on_fee = round(fee * _GST_RATE, 2)
+        fee, gst_on_fee, net_amount = calculate_settlement_amounts(
+            amount, payment_method
+        )
         tds_rate, tds_section = _TDS_RULES[payment_method]
         ledger.append(
             LedgerEntry(
@@ -344,7 +350,7 @@ def _split_rows(
                 gross_amount=amount,
                 fee=fee,
                 gst_on_fee=gst_on_fee,
-                net_amount=round(amount - fee - gst_on_fee, 2),
+                net_amount=net_amount,
                 payment_method=payment_method,
                 settlement_date=order_date + timedelta(days=1),
                 tds_deducted=round(amount * tds_rate, 2),

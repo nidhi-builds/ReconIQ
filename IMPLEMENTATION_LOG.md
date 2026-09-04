@@ -64,6 +64,19 @@
 - **Edge cases:** `None`, empty, whitespace-only, case variants, two-source references, repeated references, empty inputs, refunds, and stable ordering are covered.
 - **Claude checkpoint:** COMPLETE. Next review is required only when the Stage 3 design/test plan is ready.
 
+## 05 - Stage 3 Fee-Adjusted Match
+
+- **Status:** PASS - Claude review applied; Ponytail review passed.
+- **Implemented:** Per-method fees and settlement windows, rate-card-validated ledger/settlement pairing, strict `<0.50` bank tolerance, inclusive forward date windows, and mutually unique candidate matching.
+- **Gate evidence:** All 12 design fee/timing cases matched correctly; no other case or hard-negative bank row matched. Generated CSVs were refreshed.
+- **Metrics:** Precision 100%, recall 100%, 0 hard-negative matches; 18/18 focused Stage 3 cases and 65/65 full-suite tests passed.
+- **Decisions:** Settlement `net_amount` is the primary bank comparison because it records the actual gateway charge; the rate card independently validates its fee components. Ambiguous candidate graphs remain wholly unresolved.
+- **Review findings resolved:** Generator rates and windows now vary by payment method; direct fixtures cover both ambiguity directions without adding a case type.
+- **Issue:** Flat generator values could let hardcoded method logic pass; amount-close hard negatives were not testing the tolerance path.
+- **Cause / resolution:** Added distinct shared configurations and method-specific timing fixtures. Hard negatives remain structurally excluded by their nonblank bank references; a blank-ref tolerance hard negative is explicitly outside this slice.
+- **Edge cases:** Tolerance boundary, forward-date boundary, pre-settlement dates, non-INR, method mismatch, inconsistent fees, populated bank references, splits, refunds, empty inputs, and stable order are covered.
+- **Claude checkpoint:** COMPLETE. Next review is required only when the Stage 4 design/test plan is ready.
+
 ## Next
 
-- **Stage 3 - Fee-adjusted matching:** READY for design/test-plan review before implementation.
+- **Stage 4 - Split settlement matching:** READY for design/test-plan review before implementation.

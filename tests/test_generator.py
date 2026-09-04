@@ -216,6 +216,59 @@ def test_nontransaction_narrations_cover_the_planned_examples() -> None:
     }
 
 
+def test_generator_applies_distinct_payment_method_fee_rates() -> None:
+    expected_rates = {
+        "upi": 0.01,
+        "card": 0.02,
+        "netbanking": 0.015,
+        "wallet": 0.018,
+        "emi": 0.025,
+    }
+    dataset = generate_dataset(seed=42)
+
+    assert len({round(1_000 * rate, 2) for rate in expected_rates.values()}) == 5
+    for partition in (dataset.design, dataset.holdout):
+        assert {row.payment_method for row in partition.settlements} == set(
+            expected_rates
+        )
+        for row in partition.settlements:
+            assert row.fee == pytest.approx(
+                round(row.gross_amount * expected_rates[row.payment_method], 2)
+            )
+
+
+def test_generator_applies_payment_method_settlement_windows() -> None:
+    expected_windows = {
+        "upi": 2,
+        "wallet": 3,
+        "netbanking": 4,
+        "card": 5,
+        "emi": 6,
+    }
+    dataset = generate_dataset(seed=42)
+
+    for partition in (dataset.design, dataset.holdout):
+        settlement_by_id = {
+            row.settlement_id: row for row in partition.settlements
+        }
+        bank_by_id = {row.bank_txn_id: row for row in partition.bank}
+        for truth in partition.ground_truth:
+            if truth.case_type not in {
+                "TIMING_LAG_WITHIN_WINDOW",
+                "TIMING_LAG_EXCEEDED",
+            }:
+                continue
+            settlement = settlement_by_id[truth.settlement_ids[0]]
+            bank = bank_by_id[truth.bank_txn_ids[0]]
+            lag_days = (bank.value_date - settlement.settlement_date).days
+            window_days = expected_windows[settlement.payment_method]
+
+            if truth.case_type == "TIMING_LAG_WITHIN_WINDOW":
+                assert lag_days == window_days - 1
+            else:
+                assert lag_days == window_days + 1
+
+
 def test_duplicate_rows_share_the_dedup_key_but_are_distinguishable() -> None:
     dataset = generate_dataset(seed=42)
 
