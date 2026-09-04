@@ -1,9 +1,14 @@
 import csv
 from collections import Counter
+from itertools import combinations
 
 import pytest
 
 from data.generator import CASE_TYPES, generate_dataset, write_dataset
+from matching.dedup import deduplicate_ledger
+from matching.exact_match import match_exact_references
+from matching.fee_adjusted_match import match_fee_adjusted
+from matching.scope_filter import filter_non_transactions
 
 
 def test_generator_meets_partition_and_case_coverage_gate() -> None:
@@ -48,6 +53,85 @@ def test_generator_injects_split_duplicate_nontransaction_and_hard_negative_case
     assert all(len(row.ledger_ids) == 2 for row in truth_by_type["DUPLICATE_LEDGER_ENTRY"])
     assert all(row.is_transaction is False for row in truth_by_type["NON_TRANSACTION_BANK_LINE"])
     assert all(row.true_match_group is None for row in truth_by_type["HARD_NEGATIVE"])
+
+
+def test_generator_has_no_accidental_split_subset_sum_collisions() -> None:
+    dataset = generate_dataset(seed=42)
+
+    for partition in (dataset.design, dataset.holdout):
+        ledgers = deduplicate_ledger(partition.ledger).retained_entries
+        banks = filter_non_transactions(partition.bank).remaining_entries
+        exact = match_exact_references(ledgers, partition.settlements, banks)
+        fee_adjusted = match_fee_adjusted(
+            exact.remaining_ledger_entries,
+            exact.remaining_settlement_entries,
+            exact.remaining_bank_entries,
+        )
+        ledger_ref_counts = Counter(
+            row.ref_id for row in fee_adjusted.remaining_ledger_entries if row.ref_id
+        )
+        settlement_ref_counts = Counter(
+            row.ref_id
+            for row in fee_adjusted.remaining_settlement_entries
+            if row.ref_id
+        )
+        settlements_by_ref = {
+            row.ref_id: row
+            for row in fee_adjusted.remaining_settlement_entries
+            if row.ref_id and settlement_ref_counts[row.ref_id] == 1
+        }
+        parts = [
+            (row, settlements_by_ref[row.ref_id])
+            for row in fee_adjusted.remaining_ledger_entries
+            if row.ref_id
+            and ledger_ref_counts[row.ref_id] == 1
+            and row.ref_id in settlements_by_ref
+            and row.currency == "INR"
+            and row.amount > 0
+        ]
+        truth_by_bank = {
+            bank_id: truth
+            for truth in partition.ground_truth
+            for bank_id in truth.bank_txn_ids
+        }
+
+        parts_by_batch = {}
+        for part in parts:
+            settlement = part[1]
+            parts_by_batch.setdefault(
+                (settlement.payment_method, settlement.settlement_date), []
+            ).append(part)
+
+        for bank_row in fee_adjusted.remaining_bank_entries:
+            if bank_row.ref_id and bank_row.ref_id.strip():
+                continue
+            valid = []
+            # Intentionally omit bank-window filtering: this catches a wider
+            # set of accidental amount collisions than production matching.
+            for batch_parts in parts_by_batch.values():
+                for size in range(2, min(5, len(batch_parts)) + 1):
+                    for combo in combinations(batch_parts, size):
+                        if round(
+                            abs(
+                                sum(
+                                    settlement.net_amount
+                                    for _, settlement in combo
+                                )
+                                - bank_row.amount
+                            ),
+                            2,
+                        ) < 0.50:
+                            valid.append(combo)
+
+            truth = truth_by_bank[bank_row.bank_txn_id]
+            if truth.case_type == "SPLIT_SETTLEMENT":
+                assert len(valid) == 1
+                assert {row.order_id for row, _ in valid[0]} == set(truth.ledger_ids)
+                assert {
+                    row.settlement_id for _, row in valid[0]
+                } == set(truth.settlement_ids)
+            else:
+                assert valid == []
 
 
 def test_csv_export_keeps_ground_truth_out_of_matcher_inputs(tmp_path) -> None:

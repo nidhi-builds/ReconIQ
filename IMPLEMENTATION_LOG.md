@@ -77,6 +77,17 @@
 - **Edge cases:** Tolerance boundary, forward-date boundary, pre-settlement dates, non-INR, method mismatch, inconsistent fees, populated bank references, splits, refunds, empty inputs, and stable order are covered.
 - **Claude checkpoint:** COMPLETE. Next review is required only when the Stage 4 design/test plan is ready.
 
+## 06 - Stage 4 Split Settlement Match
+
+- **Status:** PASS - Claude implementation review complete; Ponytail review passed.
+- **Implemented:** Unique ledger/settlement part pairing, 2-5 part search by method and settlement date, stored-net amount comparison, inclusive method windows, and global ambiguity rejection.
+- **Gate evidence:** 28/28 focused Stage 4 and generator-invariant checks passed; 93/93 full-suite tests passed. Generated CSVs were restored.
+- **Metrics:** 6/6 design splits recovered; precision 100%, recall 100%, 0 hard-negative matches.
+- **Decisions:** Search every combination size before resolving; accept only globally unique candidates. Combination search remains intentionally limited to hackathon-size batches.
+- **Issue / resolution:** Added a partition-level subset-sum collision invariant; no seeded collisions were found. Claude identified missing direct proof for cross-bank partial overlap; the regression fixture confirms both candidates remain unresolved.
+- **Edge cases:** 2-5 parts, strict tolerance, blank refs, window boundaries, method/date mismatch, invalid currency/amount, duplicate refs, both ambiguity directions, stored net source, empty inputs, and stable ordering.
+- **Claude checkpoint:** COMPLETE - no implementation bug found; required coverage gap closed.
+
 ## Next
 
-- **Stage 4 - Split settlement matching:** READY for design/test-plan review before implementation.
+- Request approval to commit Stage 4, then prepare the Stage 5 design.
