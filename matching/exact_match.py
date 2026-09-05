@@ -56,7 +56,7 @@ def match_exact_references(
             confidence=1.0,
             method="exact_ref",
             exception_reason=None,
-            reasoning=None,
+            reasoning="Unique reference shared by ledger, settlement, and bank.",
         )
         for entry in ledger_entries
         if entry.ref_id in matched_refs

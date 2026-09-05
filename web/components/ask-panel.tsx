@@ -1,23 +1,28 @@
 "use client";
 
 import { ArrowUp, LoaderCircle } from "lucide-react";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import type { QuestionResponse } from "@/lib/types";
 
 export function AskPanel({ runId }: { runId: string }) {
   const [question, setQuestion] = useState("");
-  const [response, setResponse] = useState<QuestionResponse | null>(null);
+  const [history, setHistory] = useState<QuestionResponse[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => setHistory([]), [runId]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!question.trim()) return;
+    const submittedQuestion = question.trim();
     setLoading(true); setError("");
     try {
-      const result = await fetch("/api/question", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId, question }) });
+      const result = await fetch("/api/question", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId, question: submittedQuestion }) });
       if (!result.ok) throw new Error("Question service is unavailable");
-      setResponse(await result.json());
+      const answer = await result.json() as QuestionResponse;
+      setHistory((items) => [...items, answer]);
+      setQuestion("");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Question service is unavailable");
     } finally { setLoading(false); }
@@ -26,7 +31,7 @@ export function AskPanel({ runId }: { runId: string }) {
   return <div className="ask-layout">
     <section className="ask-thread" aria-live="polite">
       <div className="assistant-answer"><span>RI</span><div><strong>ReconIQ</strong><p>Ask about matches, exceptions, amounts, or reconciliation methods in this run.</p></div></div>
-      {response && <><div className="user-question">{response.question}</div><div className="assistant-answer"><span>RI</span><div><strong>Answer</strong><p>{response.answer}</p>{response.rows.length > 0 && <div className="answer-rows">{response.rows.map((row, index) => <code key={index}>{Object.entries(row).map(([key, value]) => `${key}: ${value}`).join(" · ")}</code>)}</div>}</div></div></>}
+      {history.map((response, answerIndex) => <div key={`${response.question}-${answerIndex}`}><div className="user-question">{response.question}</div><div className="assistant-answer"><span>RI</span><div><strong>Answer</strong><p>{response.answer}</p>{response.rows.length > 0 && <div className="answer-rows">{response.rows.map((row, index) => <code key={index}>{Object.entries(row).map(([key, value]) => `${key}: ${value}`).join(" · ")}</code>)}</div>}</div></div></div>)}
       {error && <div className="inline-error">{error}</div>}
     </section>
     <form className="ask-form" onSubmit={submit}>

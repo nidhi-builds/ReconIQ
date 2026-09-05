@@ -126,7 +126,7 @@ def match_fee_adjusted(
             confidence=0.9,
             method="fee_adjusted_window",
             exception_reason=None,
-            reasoning=None,
+            reasoning="Unique fee-adjusted settlement net amount matched one bank entry within the allowed window.",
         )
         for pair_index, bank_index in resolved
     ]

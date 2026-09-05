@@ -1,4 +1,5 @@
-export type RunStatus = "completed" | "processing" | "failed";
+export type RunStatus = "queued" | "running" | "completed" | "failed";
+export type RunType = "design" | "holdout" | "upload";
 
 export type SourceCounts = {
   ledger: number;
@@ -37,23 +38,18 @@ export type LlmMetrics = {
   estimated_cost_usd: number;
 };
 
-export type AuditSummary = {
-  status: "not_anchored" | "anchored";
-  merkle_root: string | null;
-  transaction_hash: string | null;
-};
-
 export type RunSummary = {
   id: string;
+  run_type: RunType;
   name: string;
   created_at: string;
   status: RunStatus;
+  code_version: string;
   source_counts: SourceCounts;
   summary: SummaryMetrics;
   stage_counts: StageCount[];
   exception_metrics: ExceptionMetric[];
   llm_metrics: LlmMetrics;
-  audit: AuditSummary;
 };
 
 export type ReconciliationRecord = {
@@ -76,25 +72,22 @@ export type PaginatedResults = {
 };
 
 export type TaxFinding = {
-  id: string;
-  reference: string;
-  section: string;
-  expected_tds: number;
+  record_ids: string[];
+  settlement_id: string;
+  ref_id: string | null;
+  gst_category: string;
+  tds_section: string;
+  expected_tds: number | null;
   actual_tds: number;
-  status: "clear" | "mismatch";
+  status: "CLEAR" | "MISMATCH" | "UNVERIFIABLE";
   mismatch_reason: string | null;
+  reasoning: string;
 };
 
 export type QuestionResponse = {
   question: string;
   answer: string;
   rows: Array<Record<string, string | number>>;
-};
-
-export type AuditProof = {
-  record_id: string;
-  leaf_hash: string;
-  merkle_root: string;
-  proof: string[];
-  verified: boolean;
+  generated_sql: string | null;
+  status: "ANSWERED" | "REFUSED" | "QA_UNAVAILABLE";
 };

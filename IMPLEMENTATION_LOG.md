@@ -283,3 +283,81 @@
 - **Ponytail:** PASS - orchestration delegates to existing stage functions and
   evaluation is the only new separate responsibility.
 - **Claude checkpoint:** Integration design approved before implementation.
+
+## 15 - End-to-End Integration: Supabase Store And FastAPI
+
+- **Status:** CODE PASS - live migration/readback pending.
+- **Implemented:** Added the run lifecycle, typed source round-trip, completed-only
+  reads, single-holdout enforcement, direct Supabase persistence, and run-scoped
+  FastAPI result, metric, tax, LLM, and Q&A routes.
+- **Gate evidence:** 14 focused store/API tests and the complete 219-test offline
+  Python suite pass; 4 live provider tests remain deselected.
+- **Decisions:** Partial writes remain hidden behind `running`/`failed`; no upload
+  run type, queue, auth layer, or blockchain placeholder was added.
+- **Problem / likely cause:** Supabase returned `PGRST205`; credentials reach the
+  project, but `public.runs` is absent because migration `001_runs.sql` has not
+  been applied there.
+- **Expected resolution:** Run the checked-in migration, then persist and read
+  back the design run before this slice is marked complete.
+- **Ponytail:** PASS - stdlib PostgREST transport and the database uniqueness
+  constraint keep the integration narrow.
+- **Claude checkpoint:** COMPLETE - integration design approved.
+
+## 16 - End-to-End Integration: Real-Data Next.js Dashboard
+
+- **Status:** CODE PASS - live browser gate pending.
+- **Implemented:** Removed fixtures, added holdout-first/design-fallback run
+  selection, preserved `run_id` across pages and drill-down links, aligned tax
+  types with FastAPI, and removed the unimplemented audit route and navigation.
+- **Gate evidence:** Frontend behavior tests and TypeScript pass; the optimized
+  Next.js build generates seven real-data routes successfully.
+- **Decisions:** Missing `NEXT_PUBLIC_API_URL` fails visibly; completed runs are
+  the only selectable data source.
+- **Problem / resolution:** Global query-aware navigation initially broke 404
+  prerendering; the required React `Suspense` boundary fixed the production build.
+- **Edge cases:** Requested run, holdout default, design-only fallback, no runs,
+  result filters, nullable expected TDS, and run-scoped Q&A are covered.
+- **Ponytail:** PASS - deleted fixture and audit code; one selector component and
+  three small pure helpers cover the shared behavior.
+- **Claude checkpoint:** Not required until the persisted design browser gate.
+
+## 17 - End-to-End Integration: Live Design Run
+
+- **Status:** PASS - design data is persisted and served live.
+- **Implemented:** Applied the Supabase schema, executed the live Gemini design
+  run, reconstructed it from Supabase in a fresh process, and served it through
+  FastAPI and Next.js.
+- **Gate evidence:** Design run `3790c5b7-56e3-4145-bcc0-717164c0f0b1` completed
+  in 34.02s with 87 reconciliation results and 66 tax findings. All dashboard
+  pages returned HTTP 200 with the real run label. The Next.js Q&A proxy returned
+  a grounded live Gemini answer from the persisted snapshot.
+- **Metrics:** Match precision 100%; recall 91.07%; hard-negative precision
+  100%; tax accuracy 100%. Persisted 24-question Q&A gate: 24/24 correct,
+  100% unsafe-query rejection, 1.03s average latency, $0.0079506 estimated cost.
+- **Decisions:** Design remains the only stored run; holdout is still untouched.
+- **Problem / resolution:** Browser screenshots could not run because the Codex
+  browser allowance was exhausted. Equivalent live HTTP page and API checks
+  passed; visual inspection remains a manual final check.
+- **Claude checkpoint:** Required before freezing code and executing the single
+  holdout run.
+
+## 18 - Explainable Results, Uploads, And Q&A History
+
+- **Status:** PASS - live local dashboard updated.
+- **Implemented:** Added concise source-level reasons to exact-reference,
+  fee-adjusted, and split-settlement matches; added CSV upload runs using the
+  existing schemas; and retained Ask-tab messages for the selected run session.
+- **Gate evidence:** 226 offline Python tests pass; frontend unit tests,
+  TypeScript, and production build pass. A real one-row CSV upload completed in
+  Supabase, appears in the run list, and correctly leaves precision/recall null.
+  All 62 matched records in refreshed design run `093dd2e3-07ae-4b84-9001-94348c40fd5f`
+  have nonblank reasoning.
+- **Decision:** Uploaded data gets operational metrics only; no synthetic
+  accuracy score is displayed. Q&A history is session-only and clears when the
+  selected run changes.
+- **Problem / resolution:** Exact, fee, and split match producers deliberately
+  emitted `reasoning=None`; fixed at each producer. Loopback CORS initially
+  omitted `127.0.0.1`; added it and covered preflight. A dev/build cache conflict
+  caused a temporary Next.js 500; clean restart restored the live dashboard.
+- **Ponytail:** PASS - reused CSV/Pydantic standard libraries and existing run
+  persistence; no upload storage layer or chat-history database was added.

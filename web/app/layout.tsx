@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { CircleDollarSign } from "lucide-react";
+import { Suspense } from "react";
 import { Nav } from "@/components/nav";
 import "./globals.css";
 
@@ -9,7 +10,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return <html lang="en"><body><div className="app-shell">
     <aside className="sidebar">
       <LinkBrand />
-      <Nav />
+      <Suspense><Nav /></Suspense>
       <div className="workspace"><span>Workspace</span><strong>Razorpay Buildathon</strong><small>Design environment</small></div>
     </aside>
     <main>{children}</main>

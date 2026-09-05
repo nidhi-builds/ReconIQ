@@ -78,6 +78,7 @@ def test_fee_adjusted_match_resolves_valid_amount_and_window() -> None:
     assert result.matches[0].matched is True
     assert result.matches[0].confidence == 0.9
     assert result.matches[0].method == "fee_adjusted_window"
+    assert result.matches[0].reasoning == "Unique fee-adjusted settlement net amount matched one bank entry within the allowed window."
     assert result.remaining_ledger_entries == []
     assert result.remaining_settlement_entries == []
     assert result.remaining_bank_entries == []

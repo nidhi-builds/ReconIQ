@@ -75,18 +75,18 @@ PostgREST, pytest, Next.js 15, React 19, TypeScript.
 - Produces: `app` with run list/detail/results/metrics/LLM/tax/Q&A routes and
   synchronous design/holdout execution routes.
 
-- [ ] Write failing store-contract tests for lifecycle, immutable completion,
+- [x] Write failing store-contract tests for lifecycle, immutable completion,
   single-holdout enforcement, completed-only reads, failure visibility, and
   exact typed JSON round-trips for every source model.
-- [ ] Write failing API tests for run scoping, filters, pagination, missing and
+- [x] Write failing API tests for run scoping, filters, pagination, missing and
   incomplete runs, Q&A completed-run gating, and sanitized failures.
-- [ ] Run focused tests and confirm red.
-- [ ] Add the SQL migration, minimal store implementations, configuration,
+- [x] Run focused tests and confirm red.
+- [x] Add the SQL migration, minimal store implementations, configuration,
   service, routes, CORS, and required FastAPI dependencies.
-- [ ] Verify Stage 9 reconstructs typed Supabase rows before building SQLite.
-- [ ] Run focused and complete offline suites; run Ponytail review and request
+- [x] Verify Stage 9 reconstructs typed Supabase rows before building SQLite.
+- [x] Run focused and complete offline suites; run Ponytail review and request
   commit approval.
-- [ ] Request `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, apply the migration,
+- [x] Request `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, apply the migration,
   then persist and read back one real design run.
 
 ### Task 3: Real-Data Next.js Dashboard
@@ -110,14 +110,14 @@ PostgREST, pytest, Next.js 15, React 19, TypeScript.
 - Produces: URL-persisted run selection across overview, results, detail, tax,
   and Q&A pages.
 
-- [ ] Write failing frontend tests for holdout-first selection, design fallback,
+- [x] Write failing frontend tests for holdout-first selection, design fallback,
   explicit labels, and API-only behavior.
-- [ ] Remove every fixture fallback and make missing API configuration fail
+- [x] Remove every fixture fallback and make missing API configuration fail
   visibly.
-- [ ] Add the shared run selector and propagate `run_id` through navigation and
+- [x] Add the shared run selector and propagate `run_id` through navigation and
   question requests.
-- [ ] Hide audit navigation and UI until blockchain exists.
-- [ ] Run frontend tests, TypeScript checks, and a production build.
+- [x] Hide audit navigation and UI until blockchain exists.
+- [x] Run frontend tests, TypeScript checks, and a production build.
 - [ ] Start both servers and use browser screenshots to verify desktop/mobile,
   real design data, selector persistence, result drill-down, tax, and Q&A.
 - [ ] Run Ponytail review, update the log, and request commit approval.
@@ -132,9 +132,9 @@ PostgREST, pytest, Next.js 15, React 19, TypeScript.
 **Interfaces:**
 - Produces: one completed design run and one immutable holdout run in Supabase.
 
-- [ ] Run and record the complete persisted design pipeline, including stage,
+- [x] Run and record the complete persisted design pipeline, including stage,
   exception, tax, LLM, and total-runtime metrics.
-- [ ] Re-run all 24 Stage 9 questions through Supabase reconstruction; require
+- [x] Re-run all 24 Stage 9 questions through Supabase reconstruction; require
   at least 90% accuracy, 100% unsafe rejection, and 100% run isolation.
 - [ ] Verify every frontend page against the real design `run_id`.
 - [ ] Record hosting timeout and prove it exceeds `3 * design runtime + 10s`, or

@@ -7,6 +7,7 @@ pytest-cache-files-*/
 *.py[cod]
 node_modules/
 .next/
+*.tsbuildinfo
 data/generated/
 data/llm_cache.sqlite3
 observability/evaluations/*.sqlite3

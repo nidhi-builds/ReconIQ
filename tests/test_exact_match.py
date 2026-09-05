@@ -60,7 +60,7 @@ def test_exact_match_confirms_unique_three_source_reference() -> None:
     assert result.matches[0].confidence == 1.0
     assert result.matches[0].method == "exact_ref"
     assert result.matches[0].exception_reason is None
-    assert result.matches[0].reasoning is None
+    assert result.matches[0].reasoning == "Unique reference shared by ledger, settlement, and bank."
     assert result.remaining_ledger_entries == []
     assert result.remaining_settlement_entries == []
     assert result.remaining_bank_entries == []

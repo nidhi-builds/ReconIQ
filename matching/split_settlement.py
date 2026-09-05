@@ -159,7 +159,10 @@ def match_split_settlements(
             confidence=0.85,
             method="split_settlement",
             exception_reason=None,
-            reasoning=None,
+            reasoning=(
+                f"Unique {len(combo)}-part settlement net-total matched one bank entry "
+                "within the allowed window."
+            ),
         )
         for combo, bank_index in resolved
     ]
