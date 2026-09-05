@@ -15,4 +15,5 @@
 - Stage 5 must correctly net or specifically tag every refund record. Stage 6 must return a reason for every input and never auto-match below 0.5 confidence.
 - Stage 7 must assign exactly one exception category to every unresolved record.
 - Ground-truth fields remain outside matcher inputs and are used only for scoring.
+- Persist at most one holdout run; after it exists, matching-rule or threshold changes make any later holdout execution a new evaluation, never the original untouched holdout.
 - The synthetic generator is deterministic by seed and produces exactly 85 design and 35 holdout scenarios. Every case type requires at least 4 design and 2 holdout instances before matching work begins.

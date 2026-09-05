@@ -328,7 +328,9 @@ Build only after Sections 6-8 are stable (Day 5).
 
 ## 10. Blockchain Audit Trail (`audit/merkle.py`, `audit/chain_client.py`, `audit/contract/AuditLog.sol`)
 
-Scope in after Sections 6-9 are solid (Day 6, time-permitting).
+Scope in only after Stages 0-9 are wired through the orchestrator, Supabase,
+FastAPI, and the real-data Next.js dashboard, including the frozen holdout run
+(Day 6, time-permitting).
 1. SHA-256 hash of every finalized `ReconciliationResult`.
 2. Batch a run's hashes into a Merkle tree.
 3. Minimal Solidity contract on Base Sepolia / Polygon Amoy anchoring just the root:

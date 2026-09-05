@@ -259,3 +259,27 @@
   hidden behind longer retries.
 - **Claude checkpoint:** Stage 9 design approved before implementation. NVIDIA
   certification is a separate optional follow-up and remains disabled.
+
+## 14 - End-to-End Integration: Pipeline And Evaluation
+
+- **Status:** PASS - ready for commit review.
+- **Implemented:** Added the sole Stages 0-8 orchestrator, typed pipeline input
+  and output boundaries, operational stage counts, and a separate truth-only
+  evaluator for matching, exceptions, hard negatives, and tax findings.
+- **Gate evidence:** 4/4 focused integration tests and 205/205 complete offline
+  tests pass; 4 live tests were intentionally deselected.
+- **Metrics:** Design set scored 100% match precision, 100% match recall, 100%
+  hard-negative precision, 100% tax accuracy, and 100% precision/recall for
+  every generated exception category with the deterministic Stage 6 test double.
+- **Decisions:** Results remain ordered by pipeline stage. Refund confirmations
+  come only from Stage 2 exact matches. Operational match rate is matched output
+  groups divided by all final output groups; truth-scored match rate remains a
+  separate evaluation metric.
+- **Problem / resolution:** Windows denied pytest's default temporary directory;
+  the established `C:\\tmp` base restored a clean test run. No pipeline defect.
+- **Edge cases:** Duplicate and excluded inputs are retained as typed evidence;
+  final transaction records have complete coverage and unique ownership; inputs
+  remain unchanged; ground truth is absent from `PipelineInput`.
+- **Ponytail:** PASS - orchestration delegates to existing stage functions and
+  evaluation is the only new separate responsibility.
+- **Claude checkpoint:** Integration design approved before implementation.

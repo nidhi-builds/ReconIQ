@@ -1,5 +1,10 @@
 # ReconIQ FastAPI Design
 
+> The runtime, persistence, execution, and holdout-access decisions in
+> `2026-09-05-end-to-end-integration-design.md` supersede the earlier in-memory
+> store and background-task proposal below. Reusable HTTP response shapes and
+> validation rules remain applicable.
+
 ## Purpose and scope
 
 FastAPI is a thin HTTP boundary around the reconciliation application. It validates uploaded source files, starts one pipeline run, and exposes the finalized results, metrics, LLM decisions, tax findings, Q&A answers, and audit proofs needed by the Next.js dashboard.
