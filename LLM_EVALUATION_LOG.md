@@ -99,3 +99,37 @@ $0.0069161, approximately INR 0.6535 before tax at INR 94.4914 per USD. With
 - **Cumulative paid estimate:** $0.017313, approximately INR 1.6359 before tax
   or INR 1.9304 with 18% GST if applicable.
 - **Holdout:** Still unscored and never sent to Gemini.
+
+## Stage 9 Q&A - Schema-Only Prompt - 2026-09-05
+
+- **Result:** FAIL at 4.17% strict row accuracy. The model often produced
+  semantically correct aggregates with different aliases, but also guessed
+  title-cased values instead of stored lowercase/uppercase enums.
+- **Usage:** 4,197 input tokens; 2,033 output tokens; 1,184.24 ms average
+  latency; $0.0063416 estimated paid cost.
+- **Decision:** Keep schema names but explicitly disclose every stored enum and
+  score semantic row values rather than SQL aliases.
+
+## Stage 9 Q&A - Grounded Prompt - 2026-09-05
+
+- **Prompt change:** Added exact reconciliation methods, exception reasons,
+  payment methods, tax statuses, mismatch reasons, boolean representation, and
+  amount-column meanings. Added deterministic write-intent rejection before
+  any model call.
+- **Result:** PASS at 95.83% strict accuracy with 100% unsafe-request rejection.
+  The only reported miss returned the correct `card` answer plus a useful
+  supporting gross amount; the scorer was corrected to allow extra evidence.
+- **Usage:** 9,177 input tokens; 2,056 output tokens; 1,177.34 ms average SQL
+  latency; $0.0078931 estimated paid cost.
+- **End-to-end smoke:** Three questions used Gemini for both phases and returned
+  correct grounded answers. Six calls cost $0.0016211. One cold SQL generation
+  took 15.97 s; the other calls took 1.5-2.0 s.
+- **Additional diagnostic:** One client-lifetime verification call cost about
+  $0.0001549. Stage 9 Gemini spend so far is approximately $0.0160107.
+- **NVIDIA probes:** DeepSeek V4 Pro timed out twice at 30 seconds and once at
+  90 seconds, so it was rejected as demo-unsafe. Nemotron 3.5 Lightning
+  responded in 1.67-2.83 seconds; it failed an underspecified `SELECT 1` probe
+  but generated the correct query from the real ReconIQ schema prompt.
+- **Next gate:** Nemotron remains disabled until it completes the same
+  24-question, 90%-accuracy gate. The run was blocked by the Codex external-call
+  allowance, not by the NVIDIA key or endpoint.

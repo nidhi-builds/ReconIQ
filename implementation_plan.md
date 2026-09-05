@@ -313,6 +313,15 @@ Build `26as_reference.csv` with deliberate mismatches; flag `SHORT_DEDUCTION`, `
 Build only after Sections 6-8 are stable (Day 5).
 - Text-to-SQL: question → LLM generates SQL against `reconciliation_results` + `tax_enrichment` → execute → answer with underlying row(s) shown.
 - Not vector RAG — data is structured. State this as a deliberate design choice in the write-up.
+- Supabase is the deployed source of truth; each request queries a run-scoped
+  in-memory SQLite snapshot so generated SQL never reaches production.
+- `gemini-2.5-flash` is primary. NVIDIA's
+  `nvidia/nemotron-3.5-lightning-30b-a3b` trial endpoint is enabled only if it
+  independently passes the same design gate; otherwise Q&A remains Gemini-only.
+- Only read-only `SELECT`/`WITH` queries over the two exposed tables run.
+  Stacked, unknown-table, schema, write, and long-running queries fail closed.
+- Return the generated SQL, evidence rows, provider/model identity, fallback
+  state, latency, tokens, and estimated cost with the grounded answer.
 **Gate:** ≥90% correct answers on a prepared 20-30 question test set.
 
 ---

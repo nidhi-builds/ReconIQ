@@ -220,3 +220,42 @@
   synthetic-tax module, or speculative abstraction was added.
 - **Claude checkpoint:** COMPLETE - approved as implemented; documented that
   challan validity takes precedence over section and amount comparisons.
+
+## 13 - Stage 9 Text-to-SQL Q&A
+
+- **Status:** COMPLETE (Gemini-only) - NVIDIA remains disabled pending its
+  independent live gate.
+- **Implemented:** Typed run-scoped SQLite snapshots, read-only SQL authorizer,
+  stacked-query rejection, 50-row cap, 250 ms runtime guard, grounded answers,
+  provider affinity, telemetry, Gemini adapter, and Nemotron NIM adapter.
+- **Gate evidence:** 27/27 focused offline tests pass; complete offline suite
+  passes (201 passed, 4 live tests deselected). Grounded
+  Gemini SQL gate passed 23/24 (95.83%) with 100% unsafe-request rejection.
+- **Gemini behavior:** Three real end-to-end questions returned correct SQL,
+  evidence rows, and natural-language answers for match rate, tax mismatches,
+  and highest-gross payment method.
+- **Metrics:** Grounded 24-question run used 9,177 input and 2,056 output tokens,
+  averaged 1,177.34 ms, and cost $0.0078931. End-to-end smoke cost $0.0016211;
+  one cold SQL call took 15.97 s while the other five calls took 1.5-2.0 s.
+- **Decisions:** Provider affinity is explicit; unsafe SQL short-circuits;
+  stacked statements rely on `sqlite3.execute()` plus a regression test; a
+  250 ms progress guard bounds execution and refuses without fallback; caught
+  stacked-statement errors enter Q&A telemetry; metrics include cost. Exact
+  stored enums are prompt-visible; scoring compares semantic row values and
+  accepts harmless extra evidence columns.
+- **Problems / resolution:** A temporary Gemini client closed before its call;
+  retaining it locally matched the working Stage 6 pattern. The first live
+  prompt omitted stored enum spellings and produced only 4.17% strict accuracy;
+  grounding those values raised the next run to 95.83%. Its sole reported miss
+  was a correct answer with an extra supporting amount, so the scorer now
+  treats extra evidence as valid. DeepSeek V4 Pro timed out at both 30- and
+  90-second limits. Nemotron responded within 1.67-2.83 seconds and generated
+  correct SQL when given the real schema-grounded prompt; its full gate could
+  not run because the Codex external-call allowance was exhausted.
+- **Risk / contingency:** NVIDIA is a trial service. If unavailable, Q&A runs
+  Gemini-only and fails closed with `QA_UNAVAILABLE`.
+- **Ponytail:** PASS; stdlib SQLite and `urllib` avoided new runtime
+  dependencies, and the failing DeepSeek candidate was replaced rather than
+  hidden behind longer retries.
+- **Claude checkpoint:** Stage 9 design approved before implementation. NVIDIA
+  certification is a separate optional follow-up and remains disabled.
