@@ -40,6 +40,20 @@ export function selectRun(runs: RunSummary[], requestedId?: string): RunSummary 
     ?? runs[0];
 }
 
+export function visibleRuns(runs: RunSummary[]): RunSummary[] {
+  const latest = new Map<RunSummary["run_type"], RunSummary>();
+  for (const run of runs) {
+    if (run.run_type === "upload") continue;
+    const current = latest.get(run.run_type);
+    if (!current || new Date(run.created_at) > new Date(current.created_at)) latest.set(run.run_type, run);
+  }
+  const order = { holdout: 0, design: 1, upload: 2 };
+  return [
+    ...[...latest.values()].sort((left, right) => order[left.run_type] - order[right.run_type]),
+    ...runs.filter((run) => run.run_type === "upload").sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime()),
+  ];
+}
+
 export function runHref(path: string, runId: string): string {
   return `${path}${path.includes("?") ? "&" : "?"}run=${encodeURIComponent(runId)}`;
 }

@@ -30,6 +30,7 @@ class SourceCountsResponse(BaseModel):
     ledger: int
     settlements: int
     bank: int
+    tax_26as: int
 
 
 class SummaryMetrics(BaseModel):

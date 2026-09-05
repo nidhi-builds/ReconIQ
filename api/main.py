@@ -216,7 +216,7 @@ def _summary(run) -> RunSummary:
             matched_records=len(matched),
             exception_records=len(output.results) - len(matched),
             matched_amount=matched_amount,
-            match_rate=evaluation.match_rate if evaluation else output.metrics.match_rate,
+            match_rate=output.metrics.match_rate,
             precision=evaluation.match_precision if evaluation else None,
             recall=evaluation.match_recall if evaluation else None,
         ),

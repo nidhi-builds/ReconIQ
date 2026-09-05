@@ -15,6 +15,7 @@ const items = [
 export function Nav() {
   const pathname = usePathname();
   const runId = useSearchParams().get("run");
+
   return <nav className="nav" aria-label="Primary navigation">
     {items.map(({ href, label, icon: Icon }) => {
       const active = href === "/" ? pathname === href : pathname.startsWith(href);

@@ -1,12 +1,13 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { Upload } from "lucide-react";
+import { FormEvent, useRef, useState } from "react";
+import { RotateCcw, Upload } from "lucide-react";
 import { uploadRun } from "@/lib/api";
 
 type Source = "ledger" | "settlement" | "bank" | "tax_26as";
 
 export function UploadPanel() {
+  const form = useRef<HTMLFormElement>(null);
   const [files, setFiles] = useState<Partial<Record<Source, File>>>({});
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,10 +29,17 @@ export function UploadPanel() {
     } finally { setLoading(false); }
   }
 
-  return <form className="upload-panel" onSubmit={submit}>
+  function resetFiles() {
+    form.current?.reset();
+    setFiles({});
+    setError("");
+  }
+
+  return <form className="upload-panel" onSubmit={submit} ref={form}>
     <div><strong>Run your files</strong><span>Upload ledger, settlement, and bank CSVs. Tax 26AS is optional.</span></div>
     {(["ledger", "settlement", "bank", "tax_26as"] as Source[]).map((source) => <label key={source}>{source === "tax_26as" ? "Tax 26AS (optional)" : `${source} CSV`}<input type="file" accept=".csv,text/csv" required={source !== "tax_26as"} onChange={(event) => setFiles((items) => ({ ...items, [source]: event.target.files?.[0] }))} /></label>)}
     <button type="submit" disabled={loading || !files.ledger || !files.settlement || !files.bank}><Upload size={16} />{loading ? "Running..." : "Upload & run"}</button>
+    <button className="secondary-action" type="button" disabled={loading || Object.keys(files).length === 0} onClick={resetFiles}><RotateCcw size={15} />Reset files</button>
     {error && <span className="inline-error">{error}</span>}
   </form>;
 }

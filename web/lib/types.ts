@@ -5,6 +5,7 @@ export type SourceCounts = {
   ledger: number;
   settlements: number;
   bank: number;
+  tax_26as: number;
 };
 
 export type SummaryMetrics = {

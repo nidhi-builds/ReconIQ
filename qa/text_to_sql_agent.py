@@ -646,8 +646,8 @@ tds_section, expected_tds, actual_tds, status, mismatch_reason, reasoning)
 
 Exact stored values and meanings:
 - matched is 1 for matched and 0 for unresolved.
-- method is one of exact_ref, fee_adjusted, split_settlement, llm, or
-  exception_rules.
+- method is one of exact_ref, fee_adjusted_window, split_settlement,
+  refund_reversal, llm_remainder, or exception_rules.
 - exception_reason is one of MISSING_REF_ID, CURRENCY_MISMATCH,
   TIMING_LAG_EXCEEDED, REFUND_UNLINKED, SPLIT_SETTLEMENT_UNRESOLVED, or
   AMOUNT_MISMATCH_UNEXPLAINED.

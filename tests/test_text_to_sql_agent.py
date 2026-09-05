@@ -451,7 +451,8 @@ def test_sql_prompt_defines_exact_domain_values() -> None:
     answer_question("Count exact matches.", *qa_inputs(), primary=provider)
 
     assert "exact_ref" in prompts[0]
-    assert "split_settlement" in prompts[0]
+    assert "fee_adjusted_window" in prompts[0]
+    assert "llm_remainder" in prompts[0]
     assert "SHORT_DEDUCTION" in prompts[0]
     assert "payment_method values are lowercase" in prompts[0]
 
@@ -543,10 +544,10 @@ QA_QUESTIONS = [
     ("How many results are matched?", "SELECT COUNT(*) AS count FROM reconciliation_results WHERE matched = 1", [{"count": 4}]),
     ("How many results remain unresolved?", "SELECT COUNT(*) AS count FROM reconciliation_results WHERE matched = 0", [{"count": 3}]),
     ("What percentage of results are matched?", "SELECT ROUND(AVG(matched) * 100, 2) AS match_rate_percent FROM reconciliation_results", [{"match_rate_percent": 57.14}]),
-    ("Show counts grouped by reconciliation method.", "SELECT method, COUNT(*) AS count FROM reconciliation_results GROUP BY method ORDER BY method", [{"method": "exact_ref", "count": 1}, {"method": "exception_rules", "count": 3}, {"method": "fee_adjusted", "count": 1}, {"method": "llm", "count": 1}, {"method": "split_settlement", "count": 1}]),
+    ("Show counts grouped by reconciliation method.", "SELECT method, COUNT(*) AS count FROM reconciliation_results GROUP BY method ORDER BY method", [{"method": "exact_ref", "count": 1}, {"method": "exception_rules", "count": 3}, {"method": "fee_adjusted_window", "count": 1}, {"method": "llm_remainder", "count": 1}, {"method": "split_settlement", "count": 1}]),
     ("Show unresolved counts grouped by exception reason.", "SELECT exception_reason, COUNT(*) AS count FROM reconciliation_results WHERE matched = 0 GROUP BY exception_reason ORDER BY exception_reason", [{"exception_reason": "AMOUNT_MISMATCH_UNEXPLAINED", "count": 1}, {"exception_reason": "MISSING_REF_ID", "count": 1}, {"exception_reason": "TIMING_LAG_EXCEEDED", "count": 1}]),
     ("How many exact reference matches are there?", "SELECT COUNT(*) AS count FROM reconciliation_results WHERE method = 'exact_ref'", [{"count": 1}]),
-    ("How many matches were decided by the LLM?", "SELECT COUNT(*) AS count FROM reconciliation_results WHERE method = 'llm'", [{"count": 1}]),
+    ("How many matches were decided by the LLM?", "SELECT COUNT(*) AS count FROM reconciliation_results WHERE method = 'llm_remainder'", [{"count": 1}]),
     ("How many split-settlement match groups are there?", "SELECT COUNT(*) AS count FROM reconciliation_results WHERE method = 'split_settlement'", [{"count": 1}]),
     ("What is the average confidence of matched results?", "SELECT AVG(confidence) AS average_confidence FROM reconciliation_results WHERE matched = 1", [{"average_confidence": 0.945}]),
     ("What is the total matched gross amount?", "SELECT SUM(gross_amount) AS total_gross_amount FROM reconciliation_results WHERE matched = 1", [{"total_gross_amount": 4500.0}]),
@@ -571,9 +572,9 @@ def qa_design_inputs() -> tuple[
 ]:
     results = [
         result("order-1", "settlement-1", "bank-1", method="exact_ref"),
-        result("order-2", "settlement-2", "bank-2", confidence=0.98, method="fee_adjusted"),
+        result("order-2", "settlement-2", "bank-2", confidence=0.98, method="fee_adjusted_window"),
         result("order-3a", "order-3b", "settlement-3b", "settlement-3a", "bank-3", confidence=0.95, method="split_settlement"),
-        result("order-4", "settlement-4", "bank-4", confidence=0.85, method="llm"),
+        result("order-4", "settlement-4", "bank-4", confidence=0.85, method="llm_remainder"),
         result("order-5", matched=False, exception_reason="MISSING_REF_ID"),
         result("order-6", "settlement-6", matched=False, exception_reason="TIMING_LAG_EXCEEDED"),
         result("bank-7", matched=False, exception_reason="AMOUNT_MISMATCH_UNEXPLAINED"),

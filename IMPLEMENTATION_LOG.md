@@ -353,11 +353,84 @@
   All 62 matched records in refreshed design run `093dd2e3-07ae-4b84-9001-94348c40fd5f`
   have nonblank reasoning.
 - **Decision:** Uploaded data gets operational metrics only; no synthetic
-  accuracy score is displayed. Q&A history is session-only and clears when the
-  selected run changes.
+  accuracy score is displayed. Q&A history is session-only and scoped to the
+  selected run.
 - **Problem / resolution:** Exact, fee, and split match producers deliberately
   emitted `reasoning=None`; fixed at each producer. Loopback CORS initially
   omitted `127.0.0.1`; added it and covered preflight. A dev/build cache conflict
   caused a temporary Next.js 500; clean restart restored the live dashboard.
 - **Ponytail:** PASS - reused CSV/Pydantic standard libraries and existing run
   persistence; no upload storage layer or chat-history database was added.
+
+## 19 - Dashboard Run Alignment And Ask History
+
+- **Status:** PASS - frontend checks complete; targeted API test is blocked by
+  the local Codex execution quota.
+- **Implemented:** The dashboard now shows only the newest completed run per
+  dataset type, uses that same run list across all tabs, aligns overview match
+  rate with the result rows queried by Q&A, and persists Ask history per run in
+  browser session storage across tab navigation.
+- **Gate evidence:** Web view-model tests and TypeScript pass; Overview, Ask,
+  Reconciliations, and Tax live routes return HTTP 200. The uploaded run's
+  displayed 67.6% is verified as 25 matched groups out of 37 result groups.
+- **Decision:** History remains local to the browser session and selected run;
+  no chat records are stored with financial data.
+- **Problem / resolution:** Repeated persisted design runs made the selector
+  ambiguous, and an intermediate wrapper prevented question bubbles from
+  right-aligning. The selector keeps the newest run of each type; each Ask turn
+  now has its own layout container.
+- **Ponytail:** PASS - one pure selector helper and native session storage;
+  no chat backend or new persistence schema.
+
+## 20 - Upload Run Selection
+
+- **Status:** PASS.
+- **Implemented:** Removed the sidebar upload list; the dataset dropdown keeps
+  one Design/Holdout entry and lists every upload separately by timestamp.
+- **Gate evidence:** Frontend view-model tests and TypeScript pass.
+- **Decision:** Upload history is discoverable in the existing selector, with no
+  secondary navigation or storage model.
+- **Ponytail:** PASS - reused the existing list-runs API and run-scoped Ask flow.
+
+## 21 - Upload Metrics And Q&A Method Contract
+
+- **Status:** PASS - frontend checks complete; Python regression execution is
+  blocked by the local Codex execution quota.
+- **Implemented:** Removed exception-accuracy display for uploaded runs and
+  corrected the Q&A SQL prompt to use persisted method names, including
+  `llm_remainder` and `fee_adjusted_window`.
+- **Gate evidence:** The selected upload contains one real `llm_remainder`
+  result (`result-0025`); frontend view-model tests and TypeScript pass.
+- **Decision:** Exception accuracy remains available only when ground truth is
+  present; uploaded data has none and must not imply a score.
+- **Problem / resolution:** Q&A was instructed to query obsolete method values
+  (`llm`, `fee_adjusted`) while the pipeline stores different names. The prompt
+  and its regression expectations now match the persisted schema.
+- **Ponytail:** PASS - one prompt correction and one conditional panel; no new
+  metric or Q&A data path.
+
+## 22 - Uploaded Document Scope
+
+- **Status:** PASS - live API and Q&A verified.
+- **Implemented:** Ask identifies the uploaded Ledger, Settlement, Bank, and
+  Tax 26AS documents. Missing Tax 26AS is explicit; the Tax tab renders an
+  honest empty state instead of tax findings without a source document.
+- **Gate evidence:** Restarted FastAPI returns `tax_26as: 0` for upload
+  `f9e967f7-a722-4755-b8bb-afce7b8e61b5`. A live Gemini question correctly
+  returned one `llm_remainder` match with its generated SQL.
+- **Problem / resolution:** The old API process continued serving the prior
+  response model. Restarted it with the no-project runtime path and reload.
+- **Ponytail:** PASS - exposes an existing source count; no document storage or
+  new endpoint was added.
+
+## 23 - Upload Reset And README
+
+- **Status:** PASS - frontend checks complete.
+- **Implemented:** Added a Reset files action that clears only unsubmitted CSV
+  selections. Replaced the stale README with current setup, pipeline, run type,
+  upload scope, Supabase, and verification guidance.
+- **Gate evidence:** Frontend view-model tests and TypeScript pass.
+- **Decision:** Reset never deletes a completed upload run or its persisted
+  results; existing Dataset selections remain available.
+- **Ponytail:** PASS - native form reset and local component state, no delete
+  endpoint or upload lifecycle abstraction.

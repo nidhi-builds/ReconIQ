@@ -17,7 +17,7 @@ export function RunSelector({ runs, selectedRunId }: { runs: RunSummary[]; selec
   return <label className="run-selector">
     <span>Dataset</span>
     <select value={selectedRunId} onChange={(event) => select(event.target.value)}>
-      {runs.map((run) => <option key={run.id} value={run.id}>{run.name}</option>)}
+      {runs.map((run) => <option key={run.id} value={run.id}>{run.run_type === "upload" ? `Upload - ${new Date(run.created_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}` : run.name}</option>)}
     </select>
   </label>;
 }

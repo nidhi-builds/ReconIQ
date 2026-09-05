@@ -57,7 +57,7 @@ def pipeline_output() -> PipelineRunResult:
             source_counts=SourceCounts(ledger=1, settlements=1, bank=1, tax_26as=1),
             matched_groups=1,
             exception_groups=0,
-            match_rate=1,
+            match_rate=0.5,
             stage_counts={"exact_ref": 1},
         ),
     )
@@ -98,6 +98,8 @@ def test_design_run_is_created_persisted_and_served_by_run_id() -> None:
     assert response.status_code == 201
     run_id = response.json()["id"]
     assert response.json()["status"] == "completed"
+    assert response.json()["summary"]["match_rate"] == 0.5
+    assert response.json()["source_counts"]["tax_26as"] == 1
     assert api.get("/api/v1/runs").json()[0]["id"] == run_id
     assert api.get(f"/api/v1/runs/{run_id}").status_code == 200
     page = api.get(f"/api/v1/runs/{run_id}/results").json()
