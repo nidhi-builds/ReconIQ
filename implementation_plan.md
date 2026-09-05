@@ -213,20 +213,54 @@ class MatchDecision(BaseModel):
 - Only the true remainder reaches this stage — **do not run stage 6 on records already resolved by stages 0-5.** Reasons: (1) cost and latency for zero benefit — a rule-based match is already certain; (2) it reintroduces non-determinism into a decision that was previously deterministic, which breaks the auditability the whole rules-first design exists to protect; (3) an LLM overriding a correct rule-based match with a wrong probabilistic one is a worse failure mode than a slow pipeline. If you want extra confidence on rule-based matches, do it as a **separate, offline QA sample** — pull a random 10% of rule-matched records and have the LLM sanity-check them outside the pipeline, purely for your own validation, never as a live decision path.
 - Cache decisions by record-pair (idempotency).
 - Confidence < 0.5 → do not auto-match, route to stage 7.
-**Gate:** every record reaching this stage gets a decision + non-empty reasoning string; 0 auto-matches below the 0.5 floor.
+- Build only unique, positive INR ledger/settlement pairs whose reference,
+  payment method, and gross amount agree. Gross equality proves both sources
+  describe the same sale before the LLM evaluates the uncertain bank leg.
+- Consider only blank-reference bank rows within the method window and with a
+  net-amount difference from 0.50 through 2.00; rank by amount difference,
+  date difference, then input order, and submit at most two per pair.
+- Send bank narration so the model can use partial, corrupted, or abbreviated
+  references. Do not send customer IDs, currency after the INR filter, or any
+  ground-truth field.
+- Pair adjacent ambiguous cases deterministically, leaving only an odd final
+  case unpaired. A hard negative is a `SEMANTIC_DECOY` exactly when its
+  declared-target amount difference is within the inclusive 0.50-2.00 band;
+  all other hard negatives are `FILTER_GUARD` cases.
+- Semantic decoys must reach Gemini only for their declared target. Filter
+  guards must be excluded from Stages 3, 4, and 6, including the seeded
+  split-subset sweep.
+- Persist every candidate response as an `LLMDecisionRecord`; only globally
+  unique accepted claims become `ReconciliationResult` rows. Stage 7 owns the
+  final label for everything left unresolved while retaining Stage 6 reasoning.
+**Gate:** real Gemini design-set precision 100% and recall at least 80% on
+`AMBIGUOUS_REMAINDER`; every input gets non-empty reasoning; 0 hard-negative
+matches; 0 auto-matches below the 0.5 floor. Report filter-guard exclusion and
+semantic-decoy rejection separately with sample sizes. Ground truth is
+withheld from the prompt and used only for scoring. The holdout remains
+untouched.
 
 ### Stage 7 — Exception categorization (`exceptions.py`)
 Fixed-order decision tree, first match wins:
 ```python
 def categorize_exception(record):
-    if not record.ref_id: return "MISSING_REF_ID"
+    if record.is_refund_candidate: return "REFUND_UNLINKED"
+    if not record.ledger_ref_id or not record.settlement_ref_id: return "MISSING_REF_ID"
     if record.currency != "INR": return "CURRENCY_MISMATCH"
-    if record.days_since_expected > record.method_window: return "TIMING_LAG_EXCEEDED"
-    if record.is_refund_candidate and not record.refund_resolved: return "REFUND_UNLINKED"
-    if record.could_be_split and not record.split_resolved: return "SPLIT_SETTLEMENT_UNRESOLVED"
+    if record.amount_difference < 0.5 and record.days_since_expected > record.method_window: return "TIMING_LAG_EXCEEDED"
+    if record.could_be_split: return "SPLIT_SETTLEMENT_UNRESOLVED"
     return "AMOUNT_MISMATCH_UNEXPLAINED"
 ```
-**Gate:** 100% of unresolved records get exactly one category — zero nulls, zero double-tags.
+A blank bank reference alone does not mean identity is missing: Stages 3, 4,
+and 6 intentionally process blank-reference bank rows. `MISSING_REF_ID` means
+the ledger or settlement identity anchor is absent.
+Likewise, a bank-only orphan has no source record whose reference can be
+missing, so it falls through to `AMOUNT_MISMATCH_UNEXPLAINED`.
+Recognizable negative `-refund` ledger/bank pairs take the more specific
+`REFUND_UNLINKED` fallback before the missing-settlement check because refund
+legs legitimately have no settlement row.
+
+**Gate:** 100% of unresolved records get exactly one correct category against
+design ground truth: zero nulls, zero double-tags, and 100% label accuracy.
 
 **Output schema (core deliverable table):**
 ```python
@@ -245,7 +279,10 @@ class ReconciliationResult(BaseModel):
 
 This is a real gap if left unaddressed, and a genuine differentiator if handled — most hackathon teams don't think about it.
 
-- **Rate limiting:** stage 6 only sees the true remainder (roughly 10-20% of 120 records ≈ 12-24 calls), so provider limits are unlikely to bite. Still implement exponential backoff + retry (max 3 attempts) and cap concurrency with a semaphore (e.g., 5 concurrent calls) — costs nothing to add, and its absence is an obvious gap to a judge who asks "what happens at scale."
+- **Rate limiting:** stage 6 only sees the true remainder, so calls run
+  sequentially with exponential backoff and a maximum of 3 attempts. Add
+  bounded concurrency only when measured latency or production volume requires
+  it.
 - **Cost tracking:** log estimated cost per call (`observability/llm_tracker.py`) and report **cost per resolved exception** as a metric — this doubles as proof that your rules-first architecture keeps LLM usage (and cost) small, which is itself a design strength worth stating explicitly.
 - **Call tracking:** every LLM call logged to a dedicated table — input payload, output decision, confidence, cache hit/miss, latency, timestamp. This is your audit trail for the *reasoning* layer, separate from the blockchain audit trail for the *decision* layer.
 - **Observability dashboard panel:** total calls, cache hit rate, avg latency, running cost estimate, confidence distribution. A small panel, but it's a concrete "we thought about production readiness" signal in the demo.

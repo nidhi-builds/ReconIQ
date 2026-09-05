@@ -100,6 +100,95 @@
 - **Edge cases:** Missing/blank refs, absent or duplicate originals, duplicate refund candidates, partial/amount-drift refunds, non-refund negatives, non-mutation, stable ordering, and empty inputs are covered.
 - **Claude checkpoint:** COMPLETE - implementation and generator accounting proof approved; unreachable ambiguity guard removed.
 
-## Next
+## 08 - Stage 6 LLM-Assisted Remainder
 
-- Commit Stage 5, then prepare the Stage 6 design.
+- **Status:** PASS - Claude feedback applied; correctness and Ponytail reviews
+  complete.
+- **Implemented:** Narration-based ambiguous fixtures, explicit competing
+  candidates, deterministic eligibility and top-two ranking, structured Gemini
+  decisions, global conflict rejection, SQLite caching/call tracking, retry and
+  unavailable handling, and separate audit versus reconciliation outputs.
+- **Gate evidence:** 25/25 focused Stage 6 offline tests and 152/152 full-suite
+  offline tests passed. Post-review
+  real Gemini gate accepted all 5 true ambiguous matches, rejected 4 competing
+  candidates, and rejected both semantic hard negatives.
+- **Metrics:** Live precision 100%, recall 100%, filter-guard exclusion 100%
+  (n=3), semantic-decoy rejection 100% (n=2), 0 false matches, 11 calls,
+  5,599 input tokens, 1,409 output tokens, 3,079.55 ms average latency, and
+  $0.0052022 / INR 0.4916 estimated pre-tax cost for the post-review run.
+- **Decisions:** Only INR source-consistent pairs and blank-reference banks in
+  the 0.50-2.00 amount band and method window reach Gemini. Calls remain
+  sequential; concurrency is deferred until measured latency requires it.
+- **Issue / resolution:** Prompt v1 rejected every true match because it treated
+  the fuzzy amount difference and expected ledger-gross/bank-net gap as hard
+  mismatches. Prompt v2 supplies the accounting policy and passed the live gate;
+  raw responses for both versions are preserved locally for comparison.
+- **Review fixes:** Indistinguishable evidence is checked before top-two
+  pruning and only duplicate rows are removed, so distinct candidates remain;
+  invented-ID responses are not cached; returned decisions carry latency;
+  metrics include cache-hit rate, confidence bands, and cost per resolved
+  match. A fresh raw live log supports the recorded seeded gate.
+- **Edge cases:** Currency and timing bypasses, top-two pruning, identical
+  evidence, invalid IDs, confidence floor, global conflicts, cache
+  invalidation, three-attempt outage handling, filter guards, semantic decoys,
+  and complete input reasoning are covered offline.
+- **Review:** Sol re-review found no remaining issues. Ponytail found no
+  removable Stage 6 complexity.
+- **Claude checkpoint:** COMPLETE - duplicate evidence is isolated without
+  dropping distinct candidates; all review findings are covered by regressions.
+
+## 09 - Stage 7 Exception Categorization
+
+- **Status:** PASS - Claude feedback applied; correctness and Ponytail reviews
+  complete.
+- **Implemented:** Typed exception evidence, deterministic source grouping,
+  fixed-priority labels, stable results, and duplicate-context rejection.
+- **Gate evidence:** The Stage 0-6 design flow with a narration-only Stage 6
+  test double received complete, correct labels; all 13 focused Stage 7 tests
+  and all Stage 4-7/generator regression tests passed; the full offline suite
+  passed 152/152 with one paid live test deselected.
+- **Metrics:** 100% design label accuracy; zero null labels, missing records, or
+  double-tagged records.
+- **Decision:** Missing identity means a blank ledger or settlement reference;
+  a blank bank reference alone is valid input to later matching stages.
+- **Issue / resolution:** A hard negative borrowing another case's date looked
+  late relative to its own settlement. Timing now requires both an exceeded
+  window and an amount-consistent bank leg; otherwise it remains an unexplained
+  amount mismatch.
+- **Review fixes:** Unique negative ledger-bank reversal pairs now reach the
+  refund fallback; remaining overlapping Stage 4 candidates become one split
+  exception context; contradictory nonblank bank references cannot be joined
+  by amount or date; bank-only orphans are amount mismatches rather than
+  missing references; Stage 6 test decisions no longer read ground truth.
+- **Edge cases:** Missing anchors, non-INR, timing lag, unresolved refunds,
+  unresolved splits, hard negatives, stable order, and overlapping contexts.
+- **Review:** Terra re-review found no remaining issues. Ponytail found the
+  shared Stage 4 candidate search to be the smallest non-duplicated solution.
+- **Claude checkpoint:** COMPLETE - bank-only orphan and source-missing cases
+  are explicitly distinguished and regression tested.
+
+## 10 - API and Frontend Foundations
+
+- **Status:** STRUCTURE READY - integration not started.
+- **Implemented:** Versioned FastAPI contract and a responsive Next.js App
+  Router dashboard with overview, reconciliation, tax, Q&A, and audit views.
+- **Gate evidence:** Frontend view-model tests passed, the production build
+  generated all nine routes, and all five primary pages returned HTTP 200.
+- **Decision:** Keep FastAPI as a thin boundary over the future typed pipeline;
+  the frontend uses isolated fixtures until those endpoints exist.
+- **Issue / resolution:** The frontend worker reached its usage limit after
+  writing the scaffold. The resulting files were inspected, API paths aligned,
+  and the complete build verified directly.
+- **Edge cases:** Loading, error, empty, mobile navigation, table overflow, and
+  unavailable-API states are represented.
+- **Review:** User review required before API implementation and integration.
+
+## 11 - Reconciliation Stage Guide
+
+- **Status:** COMPLETE
+- **Implemented:** Added `docs/reconciliation_stage_guide.md` with stage-by-stage input/output schemas, concrete examples, handled and unhandled problem labels, record-flow behavior, test/gate evidence, and Stage 6 live API/cache details.
+- **Gate evidence:** Documentation cross-checked against matching modules, tests, implementation plan, and implementation log; no runtime behavior changed.
+- **Metrics:** Documentation-only slice; no application test gate required.
+- **Decisions:** Keep live Gemini behavior separate from offline fake-decision tests; document the final deterministic exception stage and the explicit out-of-scope cases.
+- **Problems:** None.
+- **Claude checkpoint:** Not required for documentation-only work.

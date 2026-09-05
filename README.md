@@ -16,3 +16,13 @@ python -c "from data.generator import generate_dataset, write_dataset; write_dat
 ```
 
 Generated data is written under `data/generated/` and is intentionally ignored by Git. Matching, API, dashboard, and deployment follow in later slices.
+
+For the opt-in Stage 6 Gemini design-set gate, set `GEMINI_API_KEY` in the
+ignored `.env` file and run:
+
+```powershell
+python -m pytest -m live tests/test_llm_match.py -s
+```
+
+The live gate never sends ground truth to Gemini and does not evaluate the
+holdout partition.

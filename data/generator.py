@@ -91,11 +91,15 @@ def write_dataset(dataset: SyntheticDataset, output_dir: str | Path) -> None:
 def _generate_partition(
     split: str, case_types: list[str], rng: random.Random
 ) -> DatasetPartition:
-    cases = [
-        _build_case(split, index, case_type, rng)
-        for index, case_type in enumerate(case_types, start=1)
-    ]
-    _link_hard_negatives(cases, rng)
+    occurrences: dict[str, int] = {}
+    cases = []
+    for index, case_type in enumerate(case_types, start=1):
+        occurrence = occurrences.get(case_type, 0)
+        occurrences[case_type] = occurrence + 1
+        cases.append(_build_case(split, index, case_type, occurrence, rng))
+
+    _link_ambiguous_competitors(cases)
+    _link_hard_negatives(cases)
 
     ledger: list[LedgerEntry] = []
     settlements: list[SettlementEntry] = []
@@ -120,7 +124,11 @@ def _generate_partition(
 
 
 def _build_case(
-    split: str, index: int, case_type: str, rng: random.Random
+    split: str,
+    index: int,
+    case_type: str,
+    occurrence: int,
+    rng: random.Random,
 ) -> _CaseRows:
     case_id = f"{split}-{index:03d}"
     ref_id = f"ref-{case_id}"
@@ -249,6 +257,18 @@ def _build_case(
         # Outside deterministic amount tolerance, but close enough for LLM review.
         bank[0].ref_id = None
         bank[0].amount = round(net_amount + 1.37, 2)
+        clue = occurrence % 4
+        if clue == 0:
+            bank[0].narration = f"RAZORPAY SETTLEMENT PARTIAL REF {case_id}"
+        elif clue == 1:
+            corrupted_ref = f"{ref_id[:-1]}X"
+            bank[0].narration = (
+                f"RAZORPAY SETTLEMENT POSSIBLE TYPO {corrupted_ref}"
+            )
+        elif clue == 2:
+            bank[0].narration = f"RZP STLMNT {ref_id}"
+        else:
+            bank[0].narration = f"RAZORPAY SETTLEMENT {ref_id} ADJ +1.37"
     elif case_type == "TAX_SHORT_DEDUCTION":
         tax_mismatch = "SHORT_DEDUCTION"
     elif case_type == "TAX_MISSING_CHALLAN":
@@ -291,25 +311,108 @@ def _build_case(
     )
 
 
-def _link_hard_negatives(cases: list[_CaseRows], rng: random.Random) -> None:
-    candidates = [
+def _link_ambiguous_competitors(cases: list[_CaseRows]) -> None:
+    ambiguous = [
+        rows for rows in cases if rows.truth.case_type == "AMBIGUOUS_REMAINDER"
+    ]
+
+    for first, second in zip(ambiguous[::2], ambiguous[1::2], strict=False):
+        _link_ambiguous_pair(first, second)
+
+
+def _link_ambiguous_pair(first: _CaseRows, second: _CaseRows) -> None:
+    first_ledger = first.ledger[0]
+    first_settlement = first.settlements[0]
+    second_gross = round(first_ledger.amount + 0.25, 2)
+    fee, gst_on_fee, second_net = calculate_settlement_amounts(
+        second_gross, first_ledger.payment_method
+    )
+    tds_rate, tds_section = _TDS_RULES[first_ledger.payment_method]
+
+    second.ledger[0] = second.ledger[0].model_copy(
+        update={
+            "amount": second_gross,
+            "payment_method": first_ledger.payment_method,
+            "order_date": first_ledger.order_date,
+        }
+    )
+    second.settlements[0] = second.settlements[0].model_copy(
+        update={
+            "gross_amount": second_gross,
+            "fee": fee,
+            "gst_on_fee": gst_on_fee,
+            "net_amount": second_net,
+            "payment_method": first_ledger.payment_method,
+            "settlement_date": first_settlement.settlement_date,
+            "tds_deducted": round(second_gross * tds_rate, 2),
+            "tds_section": tds_section,
+        }
+    )
+    second.bank[0] = second.bank[0].model_copy(
+        update={
+            "amount": round(second_net + 1.37, 2),
+            "value_date": first.bank[0].value_date,
+        }
+    )
+    second.tax_26as[0] = second.tax_26as[0].model_copy(
+        update={
+            "tds_expected": round(second_gross * tds_rate, 2),
+            "tds_section_expected": tds_section,
+        }
+    )
+    first.truth.confusable_with = second.truth.case_id
+    second.truth.confusable_with = first.truth.case_id
+
+
+def _link_hard_negatives(cases: list[_CaseRows]) -> None:
+    hard_negatives = [
         rows
         for rows in cases
-        if rows.truth.case_type != "HARD_NEGATIVE" and rows.settlements
+        if rows.truth.case_type == "HARD_NEGATIVE"
     ]
-    for rows in cases:
-        if rows.truth.case_type != "HARD_NEGATIVE":
-            continue
+    solo_ambiguous = next(
+        (
+            rows
+            for rows in cases
+            if rows.truth.case_type == "AMBIGUOUS_REMAINDER"
+            and rows.truth.confusable_with is None
+        ),
+        None,
+    )
+    timing_exceeded = next(
+        rows for rows in cases if rows.truth.case_type == "TIMING_LAG_EXCEEDED"
+    )
+    semantic_targets = [
+        *([solo_ambiguous] if solo_ambiguous is not None else []),
+        timing_exceeded,
+    ]
+    filter_targets = [
+        rows
+        for rows in cases
+        if rows.truth.case_type
+        not in {"HARD_NEGATIVE", "AMBIGUOUS_REMAINDER", "TIMING_LAG_EXCEEDED"}
+        and rows.settlements
+    ]
 
-        target = rng.choice(candidates)
+    for index, rows in enumerate(hard_negatives):
+        semantic = index < len(semantic_targets)
+        target = (
+            semantic_targets[index]
+            if semantic
+            else filter_targets[(index - len(semantic_targets)) % len(filter_targets)]
+        )
         target_settlement = target.settlements[0]
         hard_negative_bank = rows.bank[0]
-        # Inside Stage 3's 0.5 tolerance by design: unrelatedness must prevent the match.
-        hard_negative_bank.amount = round(target_settlement.net_amount + 0.25, 2)
-        hard_negative_bank.value_date = target_settlement.settlement_date
-        hard_negative_bank.ref_id = (
-            f"unrelated-{rows.truth.case_id}-{target.truth.case_id}"
+        own_ref = hard_negative_bank.ref_id
+        offset = (
+            1.75
+            if semantic
+            else max(round(abs(target_settlement.net_amount) * 0.02, 2), 2.01)
         )
+        hard_negative_bank.amount = round(target_settlement.net_amount + offset, 2)
+        hard_negative_bank.value_date = target_settlement.settlement_date
+        hard_negative_bank.ref_id = None
+        hard_negative_bank.narration = f"RZP STLMNT {own_ref} UNRELATED"
         rows.truth.confusable_with = target.truth.case_id
 
 

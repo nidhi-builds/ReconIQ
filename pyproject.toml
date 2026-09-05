@@ -8,14 +8,19 @@ version = "0.1.0"
 description = "Multi-source finance reconciliation engine"
 requires-python = ">=3.13"
 dependencies = [
+    "google-genai>=1,<2",
     "pydantic>=2.12,<3",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.4,<9",
+    "python-dotenv>=1,<2",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q -p no:cacheprovider"
+addopts = "-q -p no:cacheprovider -m 'not live'"
+markers = [
+    "live: calls an external provider and may consume quota",
+]

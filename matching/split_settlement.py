@@ -26,31 +26,16 @@ class SplitSettlementMatchResult(BaseModel):
     remaining_bank_entries: list[BankEntry]
 
 
-def _group_indices_by_reference(entries: list[Entry]) -> dict[str, list[int]]:
-    grouped: dict[str, list[int]] = {}
-    for index, entry in enumerate(entries):
-        if entry.ref_id is None or not entry.ref_id.strip():
-            continue
-        grouped.setdefault(entry.ref_id, []).append(index)
-    return grouped
-
-
-def _has_blank_reference(entry: BankEntry) -> bool:
-    # Kept local while blank-reference handling has no broader shared policy.
-    return entry.ref_id is None or not entry.ref_id.strip()
-
-
-def match_split_settlements(
+def find_split_candidates(
     ledger_entries: list[LedgerEntry],
     settlement_entries: list[SettlementEntry],
     bank_entries: list[BankEntry],
-) -> SplitSettlementMatchResult:
+) -> list[Candidate]:
     ledger_by_ref = _group_indices_by_reference(ledger_entries)
     settlement_by_ref = _group_indices_by_reference(settlement_entries)
     parts_by_batch: dict[tuple[str, date], list[Part]] = {}
 
     for ledger_index, ledger in enumerate(ledger_entries):
-        # Refund legs normally lack a settlement pair; positivity is defense-in-depth.
         if (
             ledger.ref_id is None
             or len(ledger_by_ref.get(ledger.ref_id, [])) != 1
@@ -70,18 +55,10 @@ def match_split_settlements(
             (ledger_index, settlement_index)
         )
 
-    # Hard negatives are excluded here because they always carry a nonblank
-    # ref_id; the design gate does not independently stress the combination
-    # tolerance against a blank-ref hard negative.
-    blank_bank_indices = [
-        index for index, entry in enumerate(bank_entries) if _has_blank_reference(entry)
-    ]
     candidates: list[Candidate] = []
-
-    # ponytail: O(n choose k), k=2..5, is for hackathon-size batches only;
-    # replace with bounded candidate indexing if production volume requires it.
-    for bank_index in blank_bank_indices:
-        bank = bank_entries[bank_index]
+    for bank_index, bank in enumerate(bank_entries):
+        if not _has_blank_reference(bank):
+            continue
         for (method, settlement_date), parts in parts_by_batch.items():
             try:
                 window_days = settlement_window_days(method)
@@ -102,10 +79,35 @@ def match_split_settlements(
                         ),
                         2,
                     )
-                    # The stored settlement net amount is the primary source,
-                    # matching Stage 3's convention; it is not recomputed here.
                     if round(abs(total - bank.amount), 2) < 0.50:
                         candidates.append((combo, bank_index))
+    return candidates
+
+
+def _group_indices_by_reference(entries: list[Entry]) -> dict[str, list[int]]:
+    grouped: dict[str, list[int]] = {}
+    for index, entry in enumerate(entries):
+        if entry.ref_id is None or not entry.ref_id.strip():
+            continue
+        grouped.setdefault(entry.ref_id, []).append(index)
+    return grouped
+
+
+def _has_blank_reference(entry: BankEntry) -> bool:
+    # Kept local while blank-reference handling has no broader shared policy.
+    return entry.ref_id is None or not entry.ref_id.strip()
+
+
+def match_split_settlements(
+    ledger_entries: list[LedgerEntry],
+    settlement_entries: list[SettlementEntry],
+    bank_entries: list[BankEntry],
+) -> SplitSettlementMatchResult:
+    # ponytail: O(n choose k), k=2..5, is for hackathon-size batches only;
+    # replace with bounded candidate indexing if production volume requires it.
+    candidates = find_split_candidates(
+        ledger_entries, settlement_entries, bank_entries
+    )
 
     bank_counts = Counter(bank_index for _, bank_index in candidates)
     ledger_id_counts = Counter(

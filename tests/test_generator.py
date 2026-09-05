@@ -1,5 +1,6 @@
 import csv
 from collections import Counter
+from datetime import timedelta
 from itertools import combinations
 
 import pytest
@@ -9,6 +10,7 @@ from matching.dedup import deduplicate_ledger
 from matching.exact_match import match_exact_references
 from matching.fee_adjusted_match import match_fee_adjusted
 from matching.scope_filter import filter_non_transactions
+from matching.settlement_windows import settlement_window_days
 
 
 def test_generator_meets_partition_and_case_coverage_gate() -> None:
@@ -214,19 +216,17 @@ def test_non_tax_mismatch_settlements_agree_with_26as_data() -> None:
                 assert settlement.challan_number == tax.challan_number
 
 
-def test_hard_negatives_are_close_to_distinct_real_transactions() -> None:
+def test_hard_negative_variants_are_deterministic_and_target_real_transactions() -> None:
     dataset = generate_dataset(seed=42)
 
-    for partition in (dataset.design, dataset.holdout):
+    for partition, expected_counts in (
+        (dataset.design, {"semantic": 2, "filter": 3}),
+        (dataset.holdout, {"semantic": 1, "filter": 1}),
+    ):
         truth_by_case = {row.case_id: row for row in partition.ground_truth}
         settlement_by_id = {row.settlement_id: row for row in partition.settlements}
         bank_by_id = {row.bank_txn_id: row for row in partition.bank}
-        real_ref_ids = {
-            row.ref_id
-            for row in [*partition.ledger, *partition.settlements]
-            if row.ref_id
-        }
-        bank_ref_counts = Counter(row.ref_id for row in partition.bank if row.ref_id)
+        variant_counts = Counter()
 
         for truth in partition.ground_truth:
             if truth.case_type != "HARD_NEGATIVE":
@@ -236,20 +236,64 @@ def test_hard_negatives_are_close_to_distinct_real_transactions() -> None:
             target_settlement = settlement_by_id[target.settlement_ids[0]]
             hard_negative_bank = bank_by_id[truth.bank_txn_ids[0]]
             difference = abs(hard_negative_bank.amount - target_settlement.net_amount)
+            variant = "semantic" if 0.5 <= difference <= 2.0 else "filter"
+            variant_counts[variant] += 1
 
             assert target.case_id != truth.case_id
             assert target.split == truth.split
-            assert difference == pytest.approx(0.25)
-            assert difference < 0.5
+            assert hard_negative_bank.ref_id is None
             assert abs(
                 (hard_negative_bank.value_date - target_settlement.settlement_date).days
             ) <= 1
-            assert hard_negative_bank.ref_id not in {
-                target_settlement.ref_id,
-                f"ref-{truth.case_id}",
-            }
-            assert hard_negative_bank.ref_id not in real_ref_ids
-            assert bank_ref_counts[hard_negative_bank.ref_id] == 1
+            if variant == "semantic":
+                assert target.case_type in {
+                    "AMBIGUOUS_REMAINDER",
+                    "TIMING_LAG_EXCEEDED",
+                }
+                assert target_settlement.ref_id not in hard_negative_bank.narration
+            else:
+                assert difference > 2.0
+
+        assert variant_counts == expected_counts
+
+
+def test_hard_negatives_have_only_the_declared_single_settlement_collision() -> None:
+    dataset = generate_dataset(seed=42)
+
+    for partition in (dataset.design, dataset.holdout):
+        truth_by_case = {row.case_id: row for row in partition.ground_truth}
+        settlement_by_id = {row.settlement_id: row for row in partition.settlements}
+        bank_by_id = {row.bank_txn_id: row for row in partition.bank}
+
+        for truth in partition.ground_truth:
+            if truth.case_type != "HARD_NEGATIVE":
+                continue
+            bank = bank_by_id[truth.bank_txn_ids[0]]
+            target = truth_by_case[truth.confusable_with]
+            target_settlement = settlement_by_id[target.settlement_ids[0]]
+            difference = abs(bank.amount - target_settlement.net_amount)
+            semantic = 0.5 <= difference <= 2.0
+            stage_three_collisions = set()
+            stage_six_collisions = set()
+
+            for settlement in partition.settlements:
+                window_end = settlement.settlement_date + timedelta(
+                    days=settlement_window_days(settlement.payment_method)
+                )
+                if not settlement.settlement_date <= bank.value_date <= window_end:
+                    continue
+                candidate_difference = round(
+                    abs(bank.amount - settlement.net_amount), 2
+                )
+                if candidate_difference < 0.5:
+                    stage_three_collisions.add(settlement.settlement_id)
+                if 0.5 <= candidate_difference <= 2.0:
+                    stage_six_collisions.add(settlement.settlement_id)
+
+            assert stage_three_collisions == set()
+            assert stage_six_collisions == (
+                {target_settlement.settlement_id} if semantic else set()
+            )
 
 
 def test_refund_cases_include_original_and_linked_reversal_legs() -> None:
@@ -391,3 +435,87 @@ def test_ambiguous_remainders_are_outside_deterministic_amount_tolerance() -> No
             bank = bank_by_id[truth.bank_txn_ids[0]]
             difference = abs(bank.amount - settlement.net_amount)
             assert 0.5 < difference < 2.0
+
+
+def test_ambiguous_remainders_put_semantic_clues_only_in_narration() -> None:
+    dataset = generate_dataset(seed=42)
+    design = dataset.design
+    bank_by_id = {row.bank_txn_id: row for row in design.bank}
+    narrations = []
+
+    for truth in design.ground_truth:
+        if truth.case_type != "AMBIGUOUS_REMAINDER":
+            continue
+        bank = bank_by_id[truth.bank_txn_ids[0]]
+        assert bank.ref_id is None
+        narrations.append(bank.narration)
+
+    assert len(narrations) == 5
+    assert any("PARTIAL REF" in narration for narration in narrations)
+    assert any("POSSIBLE TYPO" in narration for narration in narrations)
+    assert any("RZP STLMNT" in narration for narration in narrations)
+    assert any("ADJ +1.37" in narration for narration in narrations)
+
+
+def test_ambiguous_competitors_pair_all_but_an_odd_remainder() -> None:
+    dataset = generate_dataset(seed=42)
+
+    for partition, expected_marked in ((dataset.design, 4), (dataset.holdout, 2)):
+        truth_by_case = {row.case_id: row for row in partition.ground_truth}
+        ambiguous_truth = [
+            row
+            for row in partition.ground_truth
+            if row.case_type == "AMBIGUOUS_REMAINDER"
+        ]
+        marked = [row for row in ambiguous_truth if row.confusable_with]
+
+        assert len(marked) == expected_marked
+        assert all(
+            truth_by_case[row.confusable_with].confusable_with == row.case_id
+            for row in marked
+        )
+
+
+def test_ambiguous_fuzzy_collisions_are_never_accidental() -> None:
+    dataset = generate_dataset(seed=42)
+
+    for partition in (dataset.design, dataset.holdout):
+        truth_by_bank = {
+            bank_id: truth
+            for truth in partition.ground_truth
+            for bank_id in truth.bank_txn_ids
+        }
+        settlement_by_id = {
+            row.settlement_id: row for row in partition.settlements
+        }
+        bank_by_id = {row.bank_txn_id: row for row in partition.bank}
+        ambiguous = [
+            truth
+            for truth in partition.ground_truth
+            if truth.case_type == "AMBIGUOUS_REMAINDER"
+        ]
+
+        for truth in ambiguous:
+            settlement = settlement_by_id[truth.settlement_ids[0]]
+            collisions = {
+                truth_by_bank[bank.bank_txn_id].case_id
+                for bank in bank_by_id.values()
+                if bank.ref_id is None
+                and 0.5 <= abs(bank.amount - settlement.net_amount) <= 2.0
+                and settlement.settlement_date
+                <= bank.value_date
+                <= settlement.settlement_date
+                + timedelta(
+                    days=settlement_window_days(settlement.payment_method)
+                )
+            }
+            allowed = {truth.case_id}
+            if truth.confusable_with:
+                allowed.add(truth.confusable_with)
+            allowed.update(
+                row.case_id
+                for row in partition.ground_truth
+                if row.case_type == "HARD_NEGATIVE"
+                and row.confusable_with == truth.case_id
+            )
+            assert collisions == allowed

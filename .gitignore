@@ -8,5 +8,7 @@ pytest-cache-files-*/
 node_modules/
 .next/
 data/generated/
+data/llm_cache.sqlite3
+observability/evaluations/*.sqlite3
 coverage.xml
 htmlcov/
