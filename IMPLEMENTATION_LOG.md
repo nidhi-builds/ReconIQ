@@ -192,3 +192,31 @@
 - **Decisions:** Keep live Gemini behavior separate from offline fake-decision tests; document the final deterministic exception stage and the explicit out-of-scope cases.
 - **Problems:** None.
 - **Claude checkpoint:** Not required for documentation-only work.
+
+## 12 - Stage 8 Tax-Line Enrichment
+
+- **Status:** COMPLETE - approved design implemented with TDD and reviewed.
+- **Implemented:** Typed tax findings, unique reference-only 26AS linkage,
+  five synthetic GST categories including EMI, fixed-priority TDS mismatch
+  labels, and explicit unverifiable outcomes.
+- **Gate evidence:** 22/22 focused tests and the full offline suite passed
+  (174 passed, 1 live test deselected). Design enrichment produced 66 findings:
+  51 clear and 15 mismatches.
+- **Metrics:** Overall tag accuracy 100%; precision and recall 100% for
+  `SHORT_DEDUCTION`, `MISSING_CHALLAN`, and `WRONG_SECTION`; 0 unverifiable
+  findings on the design set.
+- **Decisions:** Settlement IDs use membership, not result position. Challans
+  compare exactly without normalization. `UNVERIFIABLE` covers broken linkage
+  and detected-but-unmodeled over-deduction/challan conflicts, distinguished by
+  reasoning.
+- **Problems / resolution:** Whitespace-only references initially linked as
+  valid; the shared local blank check now excludes them on both sides. Pytest's
+  global and OneDrive temp directories hit Windows ACL errors; rerunning with
+  `C:\tmp` isolated the environment issue and passed the complete suite.
+- **Edge cases:** Unmatched results, split matches, missing/duplicate refs,
+  mismatch priority, over-deduction, challan case/whitespace, stable order, and
+  non-mutation are covered.
+- **Ponytail:** COMPLETE - removed a redundant test parameter; no dependency,
+  synthetic-tax module, or speculative abstraction was added.
+- **Claude checkpoint:** COMPLETE - approved as implemented; documented that
+  challan validity takes precedence over section and amount comparisons.

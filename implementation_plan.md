@@ -289,11 +289,19 @@ This is a real gap if left unaddressed, and a genuine differentiator if handled 
 
 ---
 
-## 8. Tax-Line Enrichment (`tax/gst_tds_enrichment.py`, `tax/synthetic_26as.py`)
+## 8. Tax-Line Enrichment (`tax/gst_tds_enrichment.py`)
 
 Runs only on matched records — adds columns to the reconciliation result, not a separate pipeline.
-- `gst_category`: simplified synthetic schema (3-4 categories — do not model real GST law).
+- `gst_category`: five payment-method-derived synthetic categories; do not
+  model real GST law.
 - `tds_section`: small fixed set (e.g., 194C, 194J, 194H).
+- Join only on a nonblank reference unique among enriched settlements and
+  unique across 26AS rows; extract settlement IDs by membership, never result
+  position. Broken linkage and detected-but-unmodeled discrepancies are both
+  `UNVERIFIABLE`, with distinct reasoning.
+- Classification is fixed-order: missing challan, wrong section, short
+  deduction, then clear. Challans compare exactly, case-sensitively, without
+  trimming; over-deduction and conflicting challans are not clear.
 
 Build `26as_reference.csv` with deliberate mismatches; flag `SHORT_DEDUCTION`, `MISSING_CHALLAN`, `WRONG_SECTION`.
 **Gate:** ≥90% tag accuracy vs synthetic ground truth on the design set.

@@ -45,9 +45,13 @@ class PipelineMetrics(BaseModel):
 
 class TaxFinding(BaseModel):
     record_ids: list[str]
+    settlement_id: str
     ref_id: str | None
     gst_category: str
     tds_section: str
+    expected_tds: float | None
+    actual_tds: float
+    status: Literal["CLEAR", "MISMATCH", "UNVERIFIABLE"]
     mismatch_reason: Literal[
         "SHORT_DEDUCTION", "MISSING_CHALLAN", "WRONG_SECTION"
     ] | None
